@@ -19,34 +19,15 @@ const db = getFirestore(app);
 const MEAL_NAMES = { breakfast: "Breakfast", lunch: "Lunch", snacks: "Snacks", dinner: "Dinner" };
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-// An item needs at least this many reviews before it can appear in Top 5 / Worst 5
 const MIN_REVIEWS_FOR_RANKING = 2;
 
-let currentUser = null;        // the logged-in person
-let currentItemId = null;      // item open on the item page
+let currentUser = null;        
+let currentItemId = null;      
 let currentItemMeal = null;
-let myExistingReview = null;   // my old review of the open item (if any)
-let editingItemId = null;      // item being edited on the admin page
-
-// ============================================================
-// Database layout (Firestore)
-//
-//   items/{itemId}          name, meal, mrp, days[]
-//   itemPhotos/{itemId}     image  (small jpeg as text)
-//   reviews/{itemId_uid}    itemId, meal, uid, stars, comment, hasPhoto, time   (public)
-//   reviewNames/{itemId_uid} uid, itemId, name                                 (TIFRH only)
-//   photos/{itemId_uid}     uid, itemId, image
-//   canteenRatings/{uid}    cleanliness, health, quality, time
-//
-// One review per person per item. Posting again updates it.
-// Photos are kept in separate documents so lists load fast.
-// ============================================================
-
-
-// ---------------- small helpers ----------------
+let myExistingReview = null;   
+let editingItemId = null;      
 
 function escapeHtml(text) {
-  // stops people from putting HTML/JavaScript inside comments
   return String(text)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
@@ -75,7 +56,6 @@ function isAdmin() {
 }
 
 function todayName() {
-  // JavaScript counts Sunday = 0, Monday = 1, ... so shift to Mon..Sun
   const d = new Date().getDay();
   return DAY_NAMES[(d + 6) % 7];
 }
@@ -105,7 +85,6 @@ function getStarPicker(id) {
   return parseInt(document.getElementById(id).dataset.value);
 }
 
-// Phone photos are 3-5 MB. Shrink to at most maxSize pixels and save as jpeg (~50-150 KB).
 function compressImage(file, maxSize) {
   return new Promise(function (resolve, reject) {
     const reader = new FileReader();
@@ -149,11 +128,6 @@ async function loadPhotoInto(collectionName, docId, imgElement) {
   }
 }
 
-
-// ---------------- login ----------------
-// Anyone can browse. The login pop-up only opens when someone
-// clicks "Sign in to rate", or tries to submit a rating / comment.
-
 function showLoginBox(reason) {
   document.getElementById("login-reason").textContent = reason;
   document.getElementById("login-message").textContent = "";
@@ -179,7 +153,7 @@ document.getElementById("login-button").onclick = async function () {
     return;
   }
 
-  msg.textContent = "Sending...";
+  msg.textContent = "Sending link...";
   try {
     const settings = {
       url: window.location.origin + window.location.pathname,
@@ -187,28 +161,24 @@ document.getElementById("login-button").onclick = async function () {
     };
     await sendSignInLinkToEmail(auth, email, settings);
     window.localStorage.setItem("emailForSignIn", email);
-    // remember which page they were on (e.g. #item/abc123), to bring them back there
     window.localStorage.setItem("returnHash", window.location.hash);
-    msg.textContent = "Sent! Open the link in the email sent to " + email + " (check spam too).";
+    msg.textContent = "Sent! Open the login link sent to " + email;
   } catch (error) {
     msg.textContent = "Error: " + error.message;
   }
 };
 
-// When someone clicks the link in their email, they land back here with a code in the URL
 if (isSignInWithEmailLink(auth, window.location.href)) {
   let email = window.localStorage.getItem("emailForSignIn");
   if (!email) {
-    // happens if they opened the link on a different phone/computer
     email = window.prompt("Please type your @" + ALLOWED_DOMAIN + " email again to confirm:");
   }
   try {
     await signInWithEmailLink(auth, email, window.location.href);
     window.localStorage.removeItem("emailForSignIn");
   } catch (error) {
-    alert("Sign-in failed: " + error.message + "\nPlease ask for a new link.");
+    alert("Sign-in failed: " + error.message);
   }
-  // remove the long code from the address bar, and go back to the page they were on
   let returnHash = window.localStorage.getItem("returnHash");
   if (returnHash === null) returnHash = "";
   window.localStorage.removeItem("returnHash");
@@ -219,10 +189,8 @@ document.getElementById("logout-button").onclick = function () {
   signOut(auth);
 };
 
-// This runs once when the page opens, and again every time someone signs in or out
 onAuthStateChanged(auth, async function (user) {
   if (user && !isTifrhEmail(user.email)) {
-    // a non-TIFRH account somehow signed in: throw it out
     await signOut(auth);
     return;
   }
@@ -230,7 +198,6 @@ onAuthStateChanged(auth, async function (user) {
   if (user) currentUser = user;
   else currentUser = null;
 
-  // the website itself is always visible
   hideLoginBox();
   document.getElementById("app-view").style.display = "block";
 
@@ -250,14 +217,6 @@ onAuthStateChanged(auth, async function (user) {
 
   render();
 });
-
-
-// ---------------- page switching ----------------
-// The part of the URL after # decides the page:
-//   #                -> home
-//   #meal/lunch      -> list of lunch items
-//   #item/abc123     -> one item with its reviews
-//   #admin           -> admin page
 
 function render() {
   document.getElementById("home-view").style.display = "none";
@@ -280,13 +239,11 @@ setupStarPicker("pick-health");
 setupStarPicker("pick-quality");
 setupStarPicker("pick-review");
 
-
 // ---------------- HOME PAGE ----------------
 
 async function showHomePage() {
   document.getElementById("home-view").style.display = "block";
 
-  // ---- 1. overall canteen rating ----
   setStarPicker("pick-clean", 0);
   setStarPicker("pick-health", 0);
   setStarPicker("pick-quality", 0);
@@ -305,7 +262,6 @@ async function showHomePage() {
     count += 1;
 
     if (currentUser !== null && d.id === currentUser.uid) {
-      // show my old rating in the form
       setStarPicker("pick-clean", r.cleanliness);
       setStarPicker("pick-health", r.health);
       setStarPicker("pick-quality", r.quality);
@@ -319,10 +275,16 @@ async function showHomePage() {
     document.getElementById("stars-clean").textContent = starString(sumClean / count);
     document.getElementById("stars-health").textContent = starString(sumHealth / count);
     document.getElementById("stars-quality").textContent = starString(sumQuality / count);
+  } else {
+    document.getElementById("avg-clean").textContent = "—";
+    document.getElementById("avg-health").textContent = "—";
+    document.getElementById("avg-quality").textContent = "—";
+    document.getElementById("stars-clean").textContent = "☆☆☆☆☆";
+    document.getElementById("stars-health").textContent = "☆☆☆☆☆";
+    document.getElementById("stars-quality").textContent = "☆☆☆☆☆";
   }
-  document.getElementById("overall-count").textContent = "Based on " + count + " people";
+  document.getElementById("overall-count").textContent = "Based on " + count + " TIFRH members";
 
-  // ---- 2. top 5 and worst 5 items ----
   const itemsSnap = await getDocs(collection(db, "items"));
   const reviewsSnap = await getDocs(collection(db, "reviews"));
 
@@ -352,7 +314,6 @@ async function showHomePage() {
     }
   }
 
-  // highest average first
   ranked.sort(function (a, b) { return b.avg - a.avg; });
 
   const top = [];
@@ -362,7 +323,7 @@ async function showHomePage() {
 
   const worst = [];
   for (let i = ranked.length - 1; i >= 0 && worst.length < 5; i--) {
-    if (top.includes(ranked[i])) continue;   // don't show one item in both lists
+    if (top.includes(ranked[i])) continue;
     worst.push(ranked[i]);
   }
 
@@ -375,7 +336,7 @@ function fillRankList(elementId, list) {
   box.innerHTML = "";
 
   if (list.length === 0) {
-    box.innerHTML = '<p class="small">Not enough ratings yet.</p>';
+    box.innerHTML = '<p class="small">Not enough reviews yet (min ' + MIN_REVIEWS_FOR_RANKING + ').</p>';
     return;
   }
 
@@ -385,12 +346,12 @@ function fillRankList(elementId, list) {
     row.className = "rank-row";
     row.href = "#item/" + it.id;
     row.innerHTML =
-      '<span class="rank-num">' + (i + 1) + '</span>' +
+      '<span class="rank-num">#' + (i + 1) + '</span>' +
       '<div class="thumb small-thumb"><img alt=""></div>' +
-      '<div><b>' + escapeHtml(it.name) + '</b>' +
+      '<div style="flex:1"><b>' + escapeHtml(it.name) + '</b>' +
       '<div class="small">' + MEAL_NAMES[it.meal] + ' · ' +
       '<span class="stars">' + starString(it.avg) + '</span> ' +
-      it.avg.toFixed(1) + ' (' + it.count + ' reviews)</div></div>';
+      it.avg.toFixed(1) + ' (' + it.count + ')</div></div>';
     box.appendChild(row);
     loadPhotoInto("itemPhotos", it.id, row.querySelector("img"));
   }
@@ -403,12 +364,12 @@ document.getElementById("canteen-rate-button").onclick = async function () {
   const msg = document.getElementById("canteen-rate-message");
 
   if (currentUser === null) {
-    showLoginBox("Sign in with your TIFRH email to rate the canteen.");
+    showLoginBox("Sign in with your TIFRH email to rate overall canteen standards.");
     return;
   }
 
   if (clean === 0 || health === 0 || quality === 0) {
-    msg.textContent = "Please give stars for all three.";
+    msg.textContent = "Please pick stars for cleanliness, healthiness, and quality.";
     return;
   }
 
@@ -419,13 +380,12 @@ document.getElementById("canteen-rate-button").onclick = async function () {
       quality: quality,
       time: Date.now()
     });
-    msg.textContent = "Thanks! Your rating is saved.";
+    msg.textContent = "Thank you! Your canteen ratings are saved.";
     showHomePage();
   } catch (error) {
     msg.textContent = "Error: " + error.message;
   }
 };
-
 
 // ---------------- MEAL PAGE ----------------
 
@@ -434,7 +394,7 @@ async function showMealPage(meal) {
   document.getElementById("meal-title").textContent = MEAL_NAMES[meal] || meal;
 
   const box = document.getElementById("meal-items");
-  box.innerHTML = '<p class="small">Loading...</p>';
+  box.innerHTML = '<p class="small">Loading items...</p>';
 
   const itemsSnap = await getDocs(query(collection(db, "items"), where("meal", "==", meal)));
   const reviewsSnap = await getDocs(query(collection(db, "reviews"), where("meal", "==", meal)));
@@ -451,13 +411,12 @@ async function showMealPage(meal) {
     starCount[r.itemId] += 1;
   }
 
-  // alphabetical order
   const docs = itemsSnap.docs.slice();
   docs.sort(function (a, b) { return a.data().name.localeCompare(b.data().name); });
 
   box.innerHTML = "";
   if (docs.length === 0) {
-    box.innerHTML = '<p class="small">No items added yet.</p>';
+    box.innerHTML = '<p class="small">No food items added for this meal yet.</p>';
     return;
   }
 
@@ -474,7 +433,7 @@ async function showMealPage(meal) {
     }
 
     let todayBadge = "";
-    if (item.days.includes(today)) todayBadge = '<span class="badge">Available today</span>';
+    if (item.days.includes(today)) todayBadge = '<span class="badge">Available Today</span>';
 
     const card = document.createElement("a");
     card.className = "card item-card";
@@ -483,27 +442,25 @@ async function showMealPage(meal) {
       '<div class="thumb"><img alt=""></div>' +
       '<h3>' + escapeHtml(item.name) + '</h3>' +
       todayBadge +
-      '<p><b>MRP: ₹' + item.mrp + '</b></p>' +
-      '<p class="small">Available: ' + item.days.join(", ") + '</p>' +
-      '<p class="stars">' + ratingText + '</p>';
+      '<p class="price-tag"><b>₹' + item.mrp + '</b></p>' +
+      '<p class="small">Days: ' + item.days.join(", ") + '</p>' +
+      '<p class="stars" style="margin-top:6px;">' + ratingText + '</p>';
     box.appendChild(card);
     loadPhotoInto("itemPhotos", d.id, card.querySelector("img"));
   }
 }
-
 
 // ---------------- ITEM PAGE ----------------
 
 async function showItemPage(itemId) {
   document.getElementById("item-view").style.display = "block";
 
-  // reset the review form
   setStarPicker("pick-review", 0);
   document.getElementById("review-comment").value = "";
   document.getElementById("review-photo").value = "";
   document.getElementById("review-message").textContent = "";
   document.getElementById("review-delete").style.display = "none";
-  document.getElementById("review-list").innerHTML = '<p class="small">Loading...</p>';
+  document.getElementById("review-list").innerHTML = '<p class="small">Loading reviews...</p>';
   const bigPhoto = document.getElementById("item-photo");
   bigPhoto.style.display = "none";
 
@@ -520,15 +477,14 @@ async function showItemPage(itemId) {
   myExistingReview = null;
 
   document.getElementById("item-back").href = "#meal/" + item.meal;
-  document.getElementById("item-back").textContent = "← " + MEAL_NAMES[item.meal];
+  document.getElementById("item-back").textContent = "← Back to " + MEAL_NAMES[item.meal];
   document.getElementById("item-name").textContent = item.name;
   document.getElementById("item-price").textContent = "MRP: ₹" + item.mrp;
-  document.getElementById("item-days").textContent = "Available: " + item.days.join(", ");
+  document.getElementById("item-days").textContent = "Available on: " + item.days.join(", ");
   loadPhotoInto("itemPhotos", itemId, bigPhoto);
 
   const reviewsSnap = await getDocs(query(collection(db, "reviews"), where("itemId", "==", itemId)));
 
-  // newest first
   const docs = reviewsSnap.docs.slice();
   docs.sort(function (a, b) { return b.data().time - a.data().time; });
 
@@ -537,14 +493,14 @@ async function showItemPage(itemId) {
   if (docs.length > 0) {
     const avg = sum / docs.length;
     document.getElementById("item-rating").textContent =
-      starString(avg) + " " + avg.toFixed(1) + " from " + docs.length + " reviews";
+      starString(avg) + " " + avg.toFixed(1) + " / 5 (" + docs.length + " reviews)";
   } else {
-    document.getElementById("item-rating").textContent = "No ratings yet. Be the first!";
+    document.getElementById("item-rating").textContent = "No ratings yet. Be the first to review!";
   }
 
   const list = document.getElementById("review-list");
   list.innerHTML = "";
-  if (docs.length === 0) list.innerHTML = '<p class="small">No reviews yet.</p>';
+  if (docs.length === 0) list.innerHTML = '<p class="small">No customer comments or ratings yet.</p>';
 
   for (const d of docs) {
     const r = d.data();
@@ -559,12 +515,12 @@ async function showItemPage(itemId) {
     const div = document.createElement("div");
     div.className = "review";
     div.innerHTML =
-      '<div><b class="reviewer-name">TIFRH member</b> ' +
-      '<span class="stars">' + starString(r.stars) + '</span> ' +
-      '<span class="small">' + new Date(r.time).toLocaleDateString() + '</span></div>' +
+      '<div class="review-header">' +
+        '<div><b class="reviewer-name">TIFRH member</b> <span class="small">' + new Date(r.time).toLocaleDateString() + '</span></div>' +
+        '<div class="stars">' + starString(r.stars) + '</div>' +
+      '</div>' +
       '<p>' + escapeHtml(r.comment) + '</p>';
 
-    // names are only readable by signed-in TIFRH people; everyone else sees "TIFRH member"
     if (currentUser !== null) {
       loadNameInto(d.id, div.querySelector(".reviewer-name"));
     }
@@ -572,6 +528,7 @@ async function showItemPage(itemId) {
     if (r.hasPhoto) {
       const img = document.createElement("img");
       img.className = "review-photo";
+      img.alt = "Customer uploaded food photo";
       img.onclick = function () { img.classList.toggle("zoomed"); };
       div.appendChild(img);
       loadPhotoInto("photos", d.id, img);
@@ -580,7 +537,8 @@ async function showItemPage(itemId) {
     if (isAdmin()) {
       const del = document.createElement("button");
       del.className = "plain";
-      del.textContent = "Delete (admin)";
+      del.style.marginTop = "8px";
+      del.textContent = "Delete Review (Admin)";
       del.onclick = function () { deleteReview(d.id, r.hasPhoto); };
       div.appendChild(del);
     }
@@ -597,12 +555,12 @@ document.getElementById("review-submit").onclick = async function () {
   const button = document.getElementById("review-submit");
 
   if (currentUser === null) {
-    showLoginBox("Sign in with your TIFRH email to post your review.");
+    showLoginBox("Sign in with your TIFRH email to post a review or feedback.");
     return;
   }
 
   if (stars === 0) {
-    msg.textContent = "Please choose 1 to 5 stars.";
+    msg.textContent = "Please select a star rating (1 to 5 stars).";
     return;
   }
 
@@ -612,7 +570,7 @@ document.getElementById("review-submit").onclick = async function () {
   if (myExistingReview !== null) hasPhoto = myExistingReview.hasPhoto;
 
   button.disabled = true;
-  msg.textContent = "Posting...";
+  msg.textContent = "Uploading & posting review...";
   try {
     if (fileInput.files.length > 0) {
       const image = await compressImage(fileInput.files[0], 800);
@@ -624,7 +582,6 @@ document.getElementById("review-submit").onclick = async function () {
       hasPhoto = true;
     }
 
-    // the name goes in its own document, which only TIFRH people can read
     await setDoc(doc(db, "reviewNames", reviewId), {
       uid: currentUser.uid,
       itemId: currentItemId,
@@ -641,7 +598,7 @@ document.getElementById("review-submit").onclick = async function () {
       time: Date.now()
     });
 
-    msg.textContent = "Posted. Thank you!";
+    msg.textContent = "Review posted successfully!";
     showItemPage(currentItemId);
   } catch (error) {
     msg.textContent = "Error: " + error.message;
@@ -655,7 +612,7 @@ document.getElementById("review-delete").onclick = function () {
 };
 
 async function deleteReview(reviewId, hasPhoto) {
-  if (!window.confirm("Delete this review?")) return;
+  if (!window.confirm("Are you sure you want to delete this review?")) return;
   try {
     await deleteDoc(doc(db, "reviews", reviewId));
     if (hasPhoto) await deleteDoc(doc(db, "photos", reviewId));
@@ -665,7 +622,6 @@ async function deleteReview(reviewId, hasPhoto) {
     alert("Error: " + error.message);
   }
 }
-
 
 // ---------------- ADMIN PAGE ----------------
 
@@ -677,7 +633,7 @@ async function showAdminPage() {
   document.getElementById("admin-view").style.display = "block";
 
   const list = document.getElementById("admin-list");
-  list.innerHTML = '<p class="small">Loading...</p>';
+  list.innerHTML = '<p class="small">Loading items...</p>';
 
   const snap = await getDocs(collection(db, "items"));
   const docs = snap.docs.slice();
@@ -690,7 +646,7 @@ async function showAdminPage() {
   });
 
   list.innerHTML = "";
-  if (docs.length === 0) list.innerHTML = '<p class="small">No items yet. Add one above.</p>';
+  if (docs.length === 0) list.innerHTML = '<p class="small">No items yet. Add one using the form above.</p>';
 
   for (const d of docs) {
     const item = d.data();
@@ -758,14 +714,14 @@ document.getElementById("admin-save").onclick = async function () {
   }
 
   if (name === "" || isNaN(mrp) || days.length === 0) {
-    msg.textContent = "Please fill name, MRP and at least one day.";
+    msg.textContent = "Please fill name, MRP, and select at least one day.";
     return;
   }
 
   let itemId = editingItemId;
-  if (itemId === null) itemId = doc(collection(db, "items")).id;   // new random id
+  if (itemId === null) itemId = doc(collection(db, "items")).id;
 
-  msg.textContent = "Saving...";
+  msg.textContent = "Saving item...";
   try {
     await setDoc(doc(db, "items", itemId), { name: name, meal: meal, mrp: mrp, days: days });
 
@@ -774,7 +730,7 @@ document.getElementById("admin-save").onclick = async function () {
       await setDoc(doc(db, "itemPhotos", itemId), { image: image });
     }
 
-    msg.textContent = "Saved " + name + ".";
+    msg.textContent = "Successfully saved " + name + "!";
     clearAdminForm();
     showAdminPage();
   } catch (error) {
@@ -783,7 +739,7 @@ document.getElementById("admin-save").onclick = async function () {
 };
 
 async function deleteItem(itemId, name) {
-  if (!window.confirm("Delete " + name + "? Its reviews will no longer be shown.")) return;
+  if (!window.confirm("Delete " + name + "? Its reviews will no longer be visible.")) return;
   try {
     await deleteDoc(doc(db, "items", itemId));
     await deleteDoc(doc(db, "itemPhotos", itemId));
