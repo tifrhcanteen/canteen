@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TIFRH Canteen Ratings</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ===================== LOGIN SCREEN ===================== -->
+<div id="login-view" class="view">
+  <div class="login-box">
+    <h1>🍽️ TIFRH Canteen</h1>
+    <p>Rate the food. Help the canteen improve.</p>
+    <input id="login-email" type="email" placeholder="yourname@tifrh.res.in">
+    <button id="login-button">Send me a sign-in link</button>
+    <p id="login-message" class="small"></p>
+  </div>
+</div>
+
+<!-- ===================== MAIN WEBSITE ===================== -->
+<div id="app-view" class="view">
+
+  <header>
+    <a href="#" class="logo">🍽️ TIFRH Canteen</a>
+    <div>
+      <a href="#admin" id="admin-link">Admin</a>
+      <span id="user-email" class="small"></span>
+      <button id="logout-button" class="plain">Sign out</button>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ---------- HOME PAGE ---------- -->
+    <section id="home-view" class="page">
+
+      <div class="card">
+        <h2>Overall canteen rating</h2>
+        <div class="overall-grid">
+          <div class="overall-box">
+            <div class="label">🧽 Cleanliness</div>
+            <div id="avg-clean" class="big">–</div>
+            <div id="stars-clean" class="stars"></div>
+          </div>
+          <div class="overall-box">
+            <div class="label">🥗 Healthy</div>
+            <div id="avg-health" class="big">–</div>
+            <div id="stars-health" class="stars"></div>
+          </div>
+          <div class="overall-box">
+            <div class="label">⭐ Quality</div>
+            <div id="avg-quality" class="big">–</div>
+            <div id="stars-quality" class="stars"></div>
+          </div>
+        </div>
+        <p id="overall-count" class="small"></p>
+
+        <details>
+          <summary>Give / update your canteen rating</summary>
+          <div class="rate-row"><span>Cleanliness</span><div class="star-picker" id="pick-clean"></div></div>
+          <div class="rate-row"><span>Healthy</span><div class="star-picker" id="pick-health"></div></div>
+          <div class="rate-row"><span>Quality</span><div class="star-picker" id="pick-quality"></div></div>
+          <button id="canteen-rate-button">Submit rating</button>
+          <span id="canteen-rate-message" class="small"></span>
+        </details>
+      </div>
+
+      <div class="meal-grid">
+        <a class="meal-button" href="#meal/breakfast">
+          <span class="emoji">🍳</span>
+          <img src="images/breakfast.jpg" alt="" onerror="this.remove()">
+          <span class="meal-name">Breakfast</span>
+        </a>
+        <a class="meal-button" href="#meal/lunch">
+          <span class="emoji">🍛</span>
+          <img src="images/lunch.jpg" alt="" onerror="this.remove()">
+          <span class="meal-name">Lunch</span>
+        </a>
+        <a class="meal-button" href="#meal/snacks">
+          <span class="emoji">🥪</span>
+          <img src="images/snacks.jpg" alt="" onerror="this.remove()">
+          <span class="meal-name">Snacks</span>
+        </a>
+        <a class="meal-button" href="#meal/dinner">
+          <span class="emoji">🍲</span>
+          <img src="images/dinner.jpg" alt="" onerror="this.remove()">
+          <span class="meal-name">Dinner</span>
+        </a>
+      </div>
+
+      <div class="rank-grid">
+        <div class="card top-card">
+          <h2>🏆 Top 5 rated</h2>
+          <div id="top-list"></div>
+        </div>
+        <div class="card worst-card">
+          <h2>👎 5 lowest rated</h2>
+          <div id="worst-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- MEAL PAGE (list of items) ---------- -->
+    <section id="meal-view" class="page">
+      <a href="#" class="back">← Home</a>
+      <h2 id="meal-title"></h2>
+      <div id="meal-items" class="item-grid"></div>
+    </section>
+
+    <!-- ---------- ITEM PAGE (details + reviews) ---------- -->
+    <section id="item-view" class="page">
+      <a id="item-back" href="#" class="back">← Back</a>
+
+      <div class="card item-detail">
+        <div class="thumb"><img id="item-photo" alt=""></div>
+        <div>
+          <h2 id="item-name"></h2>
+          <p id="item-price"></p>
+          <p id="item-days"></p>
+          <p id="item-rating" class="stars"></p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Your review</h3>
+        <div class="star-picker" id="pick-review"></div>
+        <textarea id="review-comment" maxlength="1000" placeholder="What was good? What should improve?"></textarea>
+        <label class="form-row small">Add a photo (optional):
+          <input id="review-photo" type="file" accept="image/*">
+        </label>
+        <button id="review-submit">Post review</button>
+        <button id="review-delete" class="plain">Delete my review</button>
+        <span id="review-message" class="small"></span>
+      </div>
+
+      <h3>What people said</h3>
+      <div id="review-list" class="card"></div>
+    </section>
+
+    <!-- ---------- ADMIN PAGE (add / edit food items) ---------- -->
+    <section id="admin-view" class="page">
+      <a href="#" class="back">← Home</a>
+
+      <div class="card">
+        <h2 id="admin-form-title">Add a food item</h2>
+        <label class="form-row">Name
+          <input id="admin-name" placeholder="e.g. Masala Dosa">
+        </label>
+        <label class="form-row">Meal
+          <select id="admin-meal">
+            <option value="breakfast">Breakfast</option>
+            <option value="lunch">Lunch</option>
+            <option value="snacks">Snacks</option>
+            <option value="dinner">Dinner</option>
+          </select>
+        </label>
+        <label class="form-row">MRP (₹)
+          <input id="admin-mrp" type="number" min="0" step="0.5">
+        </label>
+        <div class="form-row days-box" id="admin-days">
+          Available on:<br>
+          <label><input type="checkbox" value="Mon"> Mon</label>
+          <label><input type="checkbox" value="Tue"> Tue</label>
+          <label><input type="checkbox" value="Wed"> Wed</label>
+          <label><input type="checkbox" value="Thu"> Thu</label>
+          <label><input type="checkbox" value="Fri"> Fri</label>
+          <label><input type="checkbox" value="Sat"> Sat</label>
+          <label><input type="checkbox" value="Sun"> Sun</label>
+        </div>
+        <label class="form-row">Photo (leave empty to keep the old one when editing)
+          <input id="admin-photo" type="file" accept="image/*">
+        </label>
+        <button id="admin-save">Save item</button>
+        <button id="admin-clear" class="plain">Clear form</button>
+        <span id="admin-message" class="small"></span>
+      </div>
+
+      <div class="card">
+        <h3>All items</h3>
+        <div id="admin-list"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
