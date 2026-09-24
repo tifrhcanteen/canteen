@@ -538,9 +538,19 @@ async function showMealPage(meal) {
     if (r.comment !== "") commentCount[r.itemId] += 1;
   }
 
-  // alphabetical order
-  const docs = itemsSnap.docs.slice();
-  docs.sort(function (a, b) { return a.data().name.localeCompare(b.data().name); });
+      // order by the first day each item is served (Mon first ... Sun last),
+     // and alphabetically for items that start on the same day
+     const docs = itemsSnap.docs.slice();
+     docs.sort(function (a, b) {
+       let firstA = 7;
+       let firstB = 7;
+       for (let i = 0; i < DAY_NAMES.length; i++) {
+         if (firstA === 7 && a.data().days.includes(DAY_NAMES[i])) firstA = i;
+         if (firstB === 7 && b.data().days.includes(DAY_NAMES[i])) firstB = i;
+       }
+       if (firstA !== firstB) return firstA - firstB;
+       return a.data().name.localeCompare(b.data().name);
+     });
 
   box.innerHTML = "";
   if (docs.length === 0) {
