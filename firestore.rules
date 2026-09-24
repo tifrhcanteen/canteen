@@ -1,0 +1,88 @@
+rules_version = '2';
+
+// These rules run on Google's servers. They are the real lock.
+// Anyone can READ ratings, comments and photos.
+// Reviewer names can only be read by signed-in TIFRH people.
+// Only a verified @tifrh.res.in login can WRITE (rate, comment, upload).
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isTifrh() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.matches('.*@tifrh[.]res[.]in$');
+    }
+
+    // SAME emails as ADMIN_EMAILS in firebase-config.js (lowercase)
+    function isAdmin() {
+      return isTifrh()
+        && request.auth.token.email in ['mkiran@tifrh.res.in'];
+    }
+
+    function validStars(v) {
+      return v is int && v >= 1 && v <= 5;
+    }
+
+    // ---- food items: everyone reads, only admins change ----
+    match /items/{itemId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /itemPhotos/{itemId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ---- reviews: one per person per item, id = itemId_uid ----
+    match /reviews/{reviewId} {
+      allow read: if true;
+
+      allow create, update: if isTifrh()
+        && request.resource.data.uid == request.auth.uid
+        && reviewId == request.resource.data.itemId + '_' + request.auth.uid
+        && !('name' in request.resource.data)
+        && validStars(request.resource.data.stars)
+        && request.resource.data.comment is string
+        && request.resource.data.comment.size() <= 1000;
+
+      allow delete: if (isTifrh() && resource.data.uid == request.auth.uid) || isAdmin();
+    }
+
+    // ---- reviewer names: ONLY TIFRH people can read these ----
+    match /reviewNames/{reviewId} {
+      allow read: if isTifrh();
+
+      allow create, update: if isTifrh()
+        && request.resource.data.uid == request.auth.uid
+        && reviewId == request.resource.data.itemId + '_' + request.auth.uid
+        && request.resource.data.name == request.auth.token.email.split('@')[0];
+
+      allow delete: if (isTifrh() && resource.data.uid == request.auth.uid) || isAdmin();
+    }
+
+    // ---- review photos ----
+    match /photos/{reviewId} {
+      allow read: if true;
+
+      allow create, update: if isTifrh()
+        && request.resource.data.uid == request.auth.uid
+        && reviewId == request.resource.data.itemId + '_' + request.auth.uid
+        && request.resource.data.image is string
+        && request.resource.data.image.size() < 900000;
+
+      allow delete: if (isTifrh() && resource.data.uid == request.auth.uid) || isAdmin();
+    }
+
+    // ---- overall canteen rating: one per person ----
+    match /canteenRatings/{userId} {
+      allow read: if true;
+      allow write: if isTifrh()
+        && request.auth.uid == userId
+        && validStars(request.resource.data.cleanliness)
+        && validStars(request.resource.data.health)
+        && validStars(request.resource.data.quality);
+    }
+  }
+}
