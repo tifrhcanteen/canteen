@@ -1,0 +1,144 @@
+rules_version = '2';
+
+// These rules run on Google's servers. They are the real lock.
+// Anyone can READ ratings, comments and photos.
+// Reviewer names can only be read by signed-in TIFRH people.
+// Only a verified @tifrh.res.in login can WRITE (rate, comment, upload).
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isTifrh() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.matches('.*@tifrh[.]res[.]in$');
+    }
+
+    // SAME emails as ADMIN_EMAILS in firebase-config.js (lowercase)
+    function isAdmin() {
+      return isTifrh()
+        && request.auth.token.email in ['mkiran@tifrh.res.in'];
+    }
+
+    function validStars(v) {
+      return v is int && v >= 1 && v <= 5;
+    }
+
+    // ---- food items: everyone reads, only admins change ----
+    match /items/{itemId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /itemPhotos/{itemId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ---- reviews: one per person per item, id = itemId_uid ----
+    match /reviews/{reviewId} {
+      allow read: if true;
+
+      allow create, update: if isTifrh()
+        && request.resource.data.uid == request.auth.uid
+        && reviewId == request.resource.data.itemId + '_' + request.auth.uid
+        && !('name' in request.resource.data)
+        && validStars(request.resource.data.stars)
+        && request.resource.data.comment is string
+        && request.resource.data.comment.size() <= 1000;
+
+      allow delete: if (isTifrh() && resource.data.uid == request.auth.uid) || isAdmin();
+    }
+
+    // ---- reviewer names: ONLY TIFRH people can read these ----
+    // id is itemId_uid for a whole-item review,
+    // or itemId_part_uid for a review of one part of a thali
+    match /reviewNames/{reviewId} {
+      allow read: if isTifrh();
+
+      allow create, update: if isTifrh()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.name == request.auth.token.email.split('@')[0]
+        && (reviewId == request.resource.data.itemId + '_' + request.auth.uid
+            || reviewId == request.resource.data.itemId + '_' + request.resource.data.get('part', 'none') + '_' + request.auth.uid);
+
+      allow delete: if (isTifrh() && resource.data.uid == request.auth.uid) || isAdmin();
+    }
+
+    // ---- reviews of one part of a thali: one per person per part ----
+    match /partReviews/{reviewId} {
+      allow read: if true;
+
+      allow create, update: if isTifrh()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.part is string
+        && request.resource.data.part.size() <= 60
+        && reviewId == request.resource.data.itemId + '_' + request.resource.data.part + '_' + request.auth.uid
+        && validStars(request.resource.data.stars)
+        && request.resource.data.comment is string
+        && request.resource.data.comment.size() <= 500;
+
+      allow delete: if (isTifrh() && resource.data.uid == request.auth.uid) || isAdmin();
+    }
+
+    // ---- review photos ----
+    match /photos/{reviewId} {
+      allow read: if true;
+
+      allow create, update: if isTifrh()
+        && request.resource.data.uid == request.auth.uid
+        && reviewId == request.resource.data.itemId + '_' + request.auth.uid
+        && request.resource.data.image is string
+        && request.resource.data.image.size() < 900000;
+
+      allow delete: if (isTifrh() && resource.data.uid == request.auth.uid) || isAdmin();
+    }
+
+    // ---- overall canteen rating: one per person ----
+    match /canteenRatings/{userId} {
+      allow read: if true;
+      allow write: if isTifrh()
+        && request.auth.uid == userId
+        && validStars(request.resource.data.cleanliness)
+        && validStars(request.resource.data.health)
+        && validStars(request.resource.data.quality);
+    }
+
+    // ---- announcements, polls, committee, gallery: everyone reads, only admins change ----
+    match /announcements/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /polls/{pollId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /committee/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /gallery/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ---- poll votes: one per person per poll, id = pollId_uid ----
+    // Only allowed while the poll is open. Votes show no names, only counts.
+    match /votes/{voteId} {
+      allow read: if true;
+
+      allow create, update: if isTifrh()
+        && request.resource.data.uid == request.auth.uid
+        && voteId == request.resource.data.pollId + '_' + request.auth.uid
+        && request.resource.data.choice is int
+        && request.resource.data.choice >= 0
+        && request.resource.data.choice < get(/databases/$(database)/documents/polls/$(request.resource.data.pollId)).data.options.size()
+        && get(/databases/$(database)/documents/polls/$(request.resource.data.pollId)).data.active == true;
+
+      allow delete: if (isTifrh() && resource.data.uid == request.auth.uid) || isAdmin();
+    }
+  }
+}

@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TIFR-H Canteen Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script>
+  // Apply the saved light/dark choice BEFORE the page draws, so it doesn't flash.
+  // First visit: follow the phone/computer setting.
+  var savedTheme = null;
+  try { savedTheme = localStorage.getItem("theme"); } catch (e) {}
+  if (savedTheme !== "light" && savedTheme !== "dark") {
+    if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) savedTheme = "dark";
+    else savedTheme = "light";
+  }
+  document.documentElement.setAttribute("data-theme", savedTheme);
+</script>
+</head>
+<body>
+
+<!-- ===================== LOGIN POP-UP (only shown when someone wants to rate) ===================== -->
+<div id="login-view" class="view">
+  <div class="login-box">
+    <div class="logo-square logo-big">
+      <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v8a2 2 0 0 0 2 2v8"/><path d="M5 3v6"/><path d="M9 3v6"/><path d="M17 21V3c-2 1-3 3.5-3 7 0 2 1 3 3 3"/></svg>
+    </div>
+    <h2>TIFR-H Sign In</h2>
+    <p id="login-reason" class="muted">Sign in with your TIFRH email to rate and comment.</p>
+    <input id="login-email" type="email" placeholder="yourname@tifrh.res.in">
+    <button id="login-button" class="btn btn-green btn-full">Send me a sign-in link</button>
+    <p id="login-message" class="small"></p>
+    <a href="javascript:void(0)" id="login-close" class="small green-link">← Just browse, don't sign in</a>
+  </div>
+</div>
+
+<!-- ===================== SIDE MENU (opened by the ☰ button) ===================== -->
+<div id="menu-backdrop" class="menu-backdrop"></div>
+<nav id="side-menu" class="side-menu">
+  <div class="side-menu-head">
+    <b>Menu</b>
+    <button id="menu-close" class="icon-btn" aria-label="Close menu">✕</button>
+  </div>
+  <a href="#" class="side-link">🏠 Home</a>
+  <a href="#committee" class="side-link">👥 Canteen Committee</a>
+  <a href="#gallery" class="side-link">🖼️ Gallery</a>
+  <a href="#admin" id="side-admin-link" class="side-link">⚙️ Admin</a>
+</nav>
+
+<!-- ===================== PHOTO VIEWER (gallery) ===================== -->
+<div id="lightbox" class="lightbox">
+  <img id="lightbox-img" alt="">
+  <p id="lightbox-caption"></p>
+  <span class="lightbox-hint">Tap anywhere to close</span>
+</div>
+
+<!-- ===================== MAIN WEBSITE ===================== -->
+<div id="app-view" class="view">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="topbar-left">
+        <button id="menu-open" class="icon-btn" aria-label="Open menu">☰</button>
+        <a href="#" class="brand">
+          <span class="logo-square">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v8a2 2 0 0 0 2 2v8"/><path d="M5 3v6"/><path d="M9 3v6"/><path d="M17 21V3c-2 1-3 3.5-3 7 0 2 1 3 3 3"/></svg>
+          </span>
+          <span class="brand-text">
+            <span class="brand-title">TIFR-H Canteen Portal</span>
+            <span class="brand-pill">Official Food Rating</span>
+          </span>
+        </a>
+      </div>
+      <div class="topbar-right">
+        <span id="user-email" class="user-email"></span>
+        <button id="theme-toggle" class="icon-btn" aria-label="Switch light / dark mode">🌙</button>
+        <button id="login-open-button" class="btn btn-green">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+          <span class="sign-in-text">TIFR-H Sign In</span>
+        </button>
+        <button id="logout-button" class="btn btn-outline">Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ---------- HOME PAGE ---------- -->
+    <section id="home-view" class="page">
+
+      <!-- canteen photo: put a file called canteen.jpg in the images folder.
+           If the file is missing, this whole box disappears. -->
+      <div id="canteen-banner" class="canteen-banner">
+        <img src="images/canteen.jpg" alt="TIFR Hyderabad canteen" onerror="document.getElementById('canteen-banner').remove()">
+      </div>
+
+      <!-- dark green overall rating card -->
+      <div class="hero">
+        <div class="hero-top">
+          <div>
+            <span class="hero-pill">TIFR Hyderabad Campus Canteen</span>
+            <h1>Overall Canteen Rating</h1>
+            <p class="hero-text">Ratings given by students, researchers, staff and faculty members
+              on hygiene, healthiness and food quality.</p>
+          </div>
+          <div class="hero-score">
+            <div id="avg-overall" class="hero-score-number">–</div>
+            <div>
+              <div id="stars-overall" class="stars"></div>
+              <div id="overall-count" class="hero-score-count">No ratings yet</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-bars">
+          <div class="bar-box">
+            <div class="bar-head"><span>🧹 Cleanliness</span><span id="avg-clean" class="bar-value">– / 5</span></div>
+            <div class="bar-track"><div id="bar-clean" class="bar-fill"></div></div>
+          </div>
+          <div class="bar-box">
+            <div class="bar-head"><span>💚 Healthiness</span><span id="avg-health" class="bar-value">– / 5</span></div>
+            <div class="bar-track"><div id="bar-health" class="bar-fill"></div></div>
+          </div>
+          <div class="bar-box">
+            <div class="bar-head"><span>🍲 Food Quality</span><span id="avg-quality" class="bar-value">– / 5</span></div>
+            <div class="bar-track"><div id="bar-quality" class="bar-fill"></div></div>
+          </div>
+        </div>
+
+        <details class="hero-rate">
+          <summary>★ Rate the canteen</summary>
+          <div class="rate-row"><span>Cleanliness</span><div class="star-picker" id="pick-clean"></div></div>
+          <div class="rate-row"><span>Healthiness</span><div class="star-picker" id="pick-health"></div></div>
+          <div class="rate-row"><span>Food Quality</span><div class="star-picker" id="pick-quality"></div></div>
+          <button id="canteen-rate-button" class="btn btn-yellow">Submit rating</button>
+          <span id="canteen-rate-message" class="small hero-message"></span>
+        </details>
+      </div>
+
+      <!-- announcements: only shown when the admin has posted at least one -->
+      <div id="announcement-section" class="announce-box" style="display: none;">
+        <div class="announce-title">📢 Announcements</div>
+        <div id="announcement-list"></div>
+      </div>
+
+      <!-- polls: only shown when there is at least one open poll -->
+      <div id="poll-section" class="card" style="display: none;">
+        <h2 class="card-title">🗳️ Have your say</h2>
+        <div id="poll-list"></div>
+      </div>
+
+      <!-- meal category cards -->
+      <div class="section-head">
+        <h2>Select Meal Category</h2>
+        <span class="muted small">Click a category to view menu items &amp; comments</span>
+      </div>
+
+      <!-- EDIT THE TIMINGS BELOW to match the real canteen hours -->
+      <div class="meal-grid">
+        <a class="meal-card" href="#meal/breakfast">
+          <div class="meal-top meal-top-1">
+            <img src="images/breakfast.jpg" alt="" onerror="this.remove()">
+            <span class="meal-top-title">Breakfast</span>
+            <span class="time-chip">🕒 7:30 AM - 10:00 AM</span>
+          </div>
+          <div class="meal-body">
+            <h3>Breakfast</h3>
+            <p class="muted">Start your day right</p>
+            <div class="meal-link"><span>View Menu &amp; Ratings</span><span>→</span></div>
+          </div>
+        </a>
+        <a class="meal-card" href="#meal/lunch">
+          <div class="meal-top meal-top-2">
+            <img src="images/lunch.jpg" alt="" onerror="this.remove()">
+            <span class="meal-top-title">Lunch</span>
+            <span class="time-chip">🕒 12:30 PM - 2:30 PM</span>
+          </div>
+          <div class="meal-body">
+            <h3>Lunch</h3>
+            <p class="muted">Wholesome &amp; filling meals</p>
+            <div class="meal-link"><span>View Menu &amp; Ratings</span><span>→</span></div>
+          </div>
+        </a>
+        <a class="meal-card" href="#meal/dinner">
+          <div class="meal-top meal-top-3">
+            <img src="images/dinner.jpg" alt="" onerror="this.remove()">
+            <span class="meal-top-title">Dinner</span>
+            <span class="time-chip">🕒 7:30 PM - 9:30 PM</span>
+          </div>
+          <div class="meal-body">
+            <h3>Dinner</h3>
+            <p class="muted">Warm &amp; relaxing dinner</p>
+            <div class="meal-link"><span>View Menu &amp; Ratings</span><span>→</span></div>
+          </div>
+        </a>
+        <a class="meal-card" href="#meal/snacks">
+          <div class="meal-top meal-top-4">
+            <img src="images/snacks.jpg" alt="" onerror="this.remove()">
+            <span class="meal-top-title">Snacks &amp; Tea</span>
+            <span class="time-chip">🕒 4:30 PM - 6:00 PM</span>
+          </div>
+          <div class="meal-body">
+            <h3>Snacks &amp; Tea</h3>
+            <p class="muted">Evening refreshing bites</p>
+            <div class="meal-link"><span>View Menu &amp; Ratings</span><span>→</span></div>
+          </div>
+        </a>
+        <a class="meal-card" href="#meal/fruits">
+          <div class="meal-top meal-top-5">
+            <img src="images/fruits.jpg" alt="" onerror="this.remove()">
+            <span class="meal-top-title">Fruits &amp; Juice</span>
+            <span class="time-chip">🕒 All day</span>
+          </div>
+          <div class="meal-body">
+            <h3>Fruits &amp; Juice</h3>
+            <p class="muted">Fresh fruits &amp; cool drinks</p>
+            <div class="meal-link"><span>View Menu &amp; Ratings</span><span>→</span></div>
+          </div>
+        </a>
+      </div>
+
+      <!-- top 5 / lowest 5 -->
+      <div class="rank-grid">
+        <div class="card">
+          <h2 class="card-title">🏆 Top 5 Rated</h2>
+          <div id="top-list"></div>
+        </div>
+        <div class="card">
+          <h2 class="card-title">⚠️ Needs Improvement</h2>
+          <div id="worst-list"></div>
+        </div>
+      </div>
+
+      <!-- latest comments: slides every 2 seconds, can be dragged / swiped -->
+      <div class="card">
+        <div class="carousel-head">
+          <h2 class="card-title">💬 Recent Feedback &amp; Improvement Notes</h2>
+          <div class="carousel-buttons">
+            <button id="recent-prev" class="icon-btn" aria-label="Previous">‹</button>
+            <button id="recent-next" class="icon-btn" aria-label="Next">›</button>
+          </div>
+        </div>
+        <div id="recent-list" class="recent-track"></div>
+      </div>
+    </section>
+
+    <!-- ---------- MEAL PAGE (list of items) ---------- -->
+    <section id="meal-view" class="page">
+      <a href="#" class="back">← Back to Categories</a>
+      <h1 id="meal-title" class="page-title"></h1>
+      <div id="meal-items" class="item-grid"></div>
+    </section>
+
+    <!-- ---------- ITEM PAGE (details + reviews) ---------- -->
+    <section id="item-view" class="page">
+      <a id="item-back" href="#" class="back">← Back</a>
+
+      <div class="card item-detail">
+        <div class="item-photo item-photo-large">
+          <span id="item-photo-name" class="item-photo-name"></span>
+          <img id="item-photo" alt="">
+        </div>
+        <div>
+          <div id="item-days" class="day-chips"></div>
+          <h1 id="item-name" class="page-title"></h1>
+          <p id="item-price" class="mrp-big"></p>
+          <div class="item-rating-row">
+            <span id="item-rating-number" class="big-number"></span>
+            <div>
+              <div id="item-rating-stars" class="stars"></div>
+              <div id="item-rating-count" class="muted small"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- parts of a thali etc.: only shown if the admin listed parts for this item -->
+      <div id="parts-section" class="card" style="display: none;">
+        <h2 class="card-title">🍛 What's inside</h2>
+        <p class="muted small">Tap a part to rate it or comment on it separately.</p>
+        <div id="parts-list"></div>
+      </div>
+
+      <div class="card">
+        <h2 id="review-card-title" class="card-title">Rate &amp; comment</h2>
+        <div class="star-picker star-picker-big" id="pick-review"></div>
+        <textarea id="review-comment" maxlength="1000" placeholder="What was good? What should improve?"></textarea>
+        <label class="form-row small muted">Add a photo (optional):
+          <input id="review-photo" type="file" accept="image/*">
+        </label>
+        <button id="review-submit" class="btn btn-dark">Post review</button>
+        <button id="review-delete" class="btn btn-outline">Delete my review</button>
+        <span id="review-message" class="small"></span>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">What people said</h2>
+        <div id="review-list"></div>
+      </div>
+    </section>
+
+    <!-- ---------- CANTEEN COMMITTEE PAGE ---------- -->
+    <section id="committee-view" class="page">
+      <a href="#" class="back">← Home</a>
+      <h1 class="page-title">Canteen Committee</h1>
+
+      <!-- only visible to admins -->
+      <div id="committee-admin" class="card" style="display: none;">
+        <h2 id="committee-form-title" class="card-title">Add a committee member</h2>
+        <label class="form-row">Name
+          <input id="committee-name" placeholder="e.g. Dr. A. Sharma">
+        </label>
+        <label class="form-row">Position
+          <input id="committee-position" placeholder="e.g. Convener">
+        </label>
+        <label class="form-row">Order on the page (1 = first)
+          <input id="committee-order" type="number" min="1" step="1" placeholder="1">
+        </label>
+        <label class="form-row">Photo (leave empty to keep the old one when editing)
+          <input id="committee-photo" type="file" accept="image/*">
+        </label>
+        <button id="committee-save" class="btn btn-green">Save member</button>
+        <button id="committee-clear" class="btn btn-outline">Clear form</button>
+        <span id="committee-message" class="small"></span>
+      </div>
+
+      <div id="committee-list" class="committee-grid"></div>
+    </section>
+
+    <!-- ---------- GALLERY PAGE ---------- -->
+    <section id="gallery-view" class="page">
+      <a href="#" class="back">← Home</a>
+      <h1 class="page-title">Gallery</h1>
+
+      <!-- only visible to admins -->
+      <div id="gallery-admin" class="card" style="display: none;">
+        <h2 class="card-title">Add photos</h2>
+        <label class="form-row">Caption (optional, used for all photos in this upload)
+          <input id="gallery-caption" placeholder="e.g. Diwali special lunch 2026">
+        </label>
+        <label class="form-row">Photos (you can pick several at once)
+          <input id="gallery-photos" type="file" accept="image/*" multiple>
+        </label>
+        <button id="gallery-upload" class="btn btn-green">Upload</button>
+        <span id="gallery-message" class="small"></span>
+      </div>
+
+      <div id="gallery-list" class="gallery-grid"></div>
+    </section>
+
+    <!-- ---------- ADMIN PAGE ---------- -->
+    <section id="admin-view" class="page">
+      <a href="#" class="back">← Back to Categories</a>
+      <h1 class="page-title">Admin</h1>
+
+      <div class="card">
+        <h2 class="card-title">📢 Announcements</h2>
+        <p class="muted small">Shown on the home page, just below the overall rating. Delete them all and the section disappears.</p>
+        <textarea id="announce-text" maxlength="500" placeholder="e.g. Canteen will be closed on Sunday for cleaning."></textarea>
+        <button id="announce-post" class="btn btn-green">Post announcement</button>
+        <span id="announce-message" class="small"></span>
+        <div id="admin-announce-list"></div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">🗳️ Polls</h2>
+        <p class="muted small">Open polls are shown on the home page. Close or delete them all and the section disappears.</p>
+        <label class="form-row">Question
+          <input id="poll-question" placeholder="e.g. Should biryani be served on Fridays too?">
+        </label>
+        <label class="form-row">Options (one per line, 2 to 6)
+          <textarea id="poll-options" placeholder="Yes&#10;No"></textarea>
+        </label>
+        <button id="poll-create" class="btn btn-green">Create poll</button>
+        <span id="poll-message" class="small"></span>
+        <div id="admin-poll-list"></div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">Starter menu</h2>
+        <p class="muted small">Adds the ready-made list of common items from <b>starter-menu.js</b> to all five
+          categories. Items that already exist (same name in the same category) are skipped.
+          Check the MRPs and days afterwards and edit them below.</p>
+        <button id="admin-seed" class="btn btn-green">Add starter menu</button>
+        <span id="admin-seed-message" class="small"></span>
+      </div>
+
+      <div class="card">
+        <h2 id="admin-form-title" class="card-title">Add a food item</h2>
+        <label class="form-row">Name
+          <input id="admin-name" placeholder="e.g. Masala Dosa">
+        </label>
+        <label class="form-row">Category
+          <select id="admin-meal">
+            <option value="breakfast">Breakfast</option>
+            <option value="lunch">Lunch</option>
+            <option value="dinner">Dinner</option>
+            <option value="snacks">Snacks &amp; Tea</option>
+            <option value="fruits">Fruits &amp; Juice</option>
+          </select>
+        </label>
+        <label class="form-row">MRP (₹)
+          <input id="admin-mrp" type="number" min="0" step="0.5">
+        </label>
+        <div class="form-row days-box" id="admin-days">
+          Available on:<br>
+          <label><input type="checkbox" value="Mon"> Mon</label>
+          <label><input type="checkbox" value="Tue"> Tue</label>
+          <label><input type="checkbox" value="Wed"> Wed</label>
+          <label><input type="checkbox" value="Thu"> Thu</label>
+          <label><input type="checkbox" value="Fri"> Fri</label>
+          <label><input type="checkbox" value="Sat"> Sat</label>
+          <label><input type="checkbox" value="Sun"> Sun</label>
+        </div>
+        <label class="form-row">Items inside (optional, one per line, e.g. for a thali: Roti, Dal, Rice ...)
+          <textarea id="admin-parts" placeholder="Roti&#10;Dal&#10;Rice&#10;Sabzi&#10;Curd"></textarea>
+        </label>
+        <label class="form-row">Photo (leave empty to keep the old one when editing)
+          <input id="admin-photo" type="file" accept="image/*">
+        </label>
+        <button id="admin-save" class="btn btn-green">Save item</button>
+        <button id="admin-clear" class="btn btn-outline">Clear form</button>
+        <span id="admin-message" class="small"></span>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">All items</h2>
+        <div id="admin-list"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    TIFR Hyderabad Canteen Feedback &amp; Rating System · Rating restricted to <code>@tifrh.res.in</code> accounts
+  </footer>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
