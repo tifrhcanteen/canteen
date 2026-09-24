@@ -844,10 +844,18 @@ async function showMealPage(meal) {
     if (r.comment !== "") commentCount[r.itemId] += 1;
   }
 
-  // order by the first day each item is served (Mon first ... Sun last),
-  // and alphabetically for items that start on the same day
+    // Order of items on the page:
+  //   1. items served TODAY come first
+  //   2. the rest by the first day they are served (Mon first ... Sun last)
+  //   3. alphabetically when two items land in the same place
+  const today = todayName();
   const docs = itemsSnap.docs.slice();
   docs.sort(function (a, b) {
+    const todayA = a.data().days.includes(today);
+    const todayB = b.data().days.includes(today);
+    if (todayA && !todayB) return -1;   // a is served today, b is not: a goes first
+    if (todayB && !todayA) return 1;    // b is served today, a is not: b goes first
+
     let firstA = 7;
     let firstB = 7;
     for (let i = 0; i < DAY_NAMES.length; i++) {
