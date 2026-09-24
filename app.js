@@ -872,7 +872,6 @@ async function showMealPage(meal) {
     return;
   }
 
-  const today = todayName();
 
   for (const d of docs) {
     const item = d.data();
